@@ -1,0 +1,13 @@
+services:
+  png2xnb:
+    build: .
+    container_name: png2xnb-server
+    restart: unless-stopped
+    ports:
+      - "5821:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
