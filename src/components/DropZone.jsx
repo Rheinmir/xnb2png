@@ -1,118 +1,82 @@
 import React from "react";
-import { Upload, Download, Trash2, Loader2, Settings } from "lucide-react";
-import FolderSelector from "./FolderSelector.jsx";
+import { useDropzone } from "react-dropzone";
 
-/**
- * Drop zone for file/folder upload with action buttons and asset type selector
- */
-const DropZone = ({
-  files,
-  fileInputRef,
-  isProcessing,
-  libStatus,
-  assetType,
-  assetSizes,
-  parentFolder,
-  childFolder,
-  onAssetTypeChange,
-  onParentFolderChange,
-  onChildFolderChange,
-  onFileChange,
-  onProcess,
-  onClear,
-}) => {
+const DropZone = ({ onFilesAdded, files }) => {
+  const onDrop = (acceptedFiles) => {
+    onFilesAdded(acceptedFiles);
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "image/png": [".png"],
+    },
+  });
+
   return (
-    <div className="space-y-4">
+    <div className="w-full">
       <div
-        className={`border-2 border-dashed rounded-3xl p-8 transition-all flex flex-col items-center justify-center gap-4 cursor-pointer
+        {...getRootProps()}
+        className={`
+          relative border-4 border-dashed rounded-lg p-10 text-center cursor-pointer transition-all
           ${
-            files.length > 0
-              ? "border-amber-500/50 bg-amber-500/5"
-              : "border-slate-800 hover:border-slate-700 bg-slate-900/30"
-          }`}
-        onClick={() => fileInputRef.current?.click()}
+            isDragActive
+              ? "border-[var(--sdv-orange)] bg-[var(--sdv-highlight)] scale-102"
+              : "border-[var(--sdv-brown)] hover:bg-[var(--sdv-cream)] hover:border-[var(--sdv-orange)]"
+          }
+        `}
+        style={{
+          backgroundColor: "rgba(255, 235, 205, 0.5)",
+        }}
       >
-        <Upload
-          className={files.length > 0 ? "text-amber-500" : "text-slate-600"}
-          size={48}
-        />
-        <div className="text-center">
-          <p className="font-bold text-slate-200">Nạp thư mục hoặc tệp</p>
-          <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest">
-            PNG (Hỗ trợ cấu trúc lồng nhau)
-          </p>
+        <input {...getInputProps()} />
+
+        <div className="space-y-4">
+          <div className="text-6xl animate-bounce">📦</div>
+          {isDragActive ? (
+            <p className="text-xl font-bold text-[var(--sdv-orange)]">
+              Drop items here!
+            </p>
+          ) : (
+            <div>
+              <p className="text-xl font-bold text-[var(--sdv-brown)]">
+                Drag & drop PNG files here
+              </p>
+              <p className="text-sm opacity-70 mt-2">
+                or click to open inventory
+              </p>
+            </div>
+          )}
         </div>
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          multiple
-          webkitdirectory="true"
-          onChange={onFileChange}
-        />
       </div>
-
-      {/* Folder Selector */}
-      <FolderSelector
-        parentFolder={parentFolder}
-        childFolder={childFolder}
-        onParentChange={onParentFolderChange}
-        onChildChange={onChildFolderChange}
-      />
-
-      {/* Asset Type Selector */}
-      <div className="bg-slate-900/50 border border-white/10 rounded-2xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Settings size={14} className="text-amber-500" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Chế độ Resize
-          </span>
-        </div>
-        <select
-          value={assetType}
-          onChange={(e) => onAssetTypeChange(e.target.value)}
-          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-amber-500/50 transition-colors"
-        >
-          <option value="auto">🔍 Auto-detect (theo tên file)</option>
-          {Object.entries(assetSizes).map(([key, size]) => (
-            <option key={key} value={key}>
-              {size.label}
-            </option>
-          ))}
-        </select>
-        <p className="text-[9px] text-slate-500 mt-2 leading-relaxed">
-          Auto-detect: portrait*, sprite*, item*, crop*, craftable*, building*
-        </p>
-      </div>
-
-      <button
-        onClick={onProcess}
-        disabled={files.length === 0 || isProcessing || libStatus !== "ready"}
-        className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 transition-all
-          ${
-            isProcessing || files.length === 0 || libStatus !== "ready"
-              ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-              : "bg-gradient-to-r from-amber-500 to-orange-600 hover:shadow-lg hover:shadow-orange-500/20 text-white active:scale-[0.98]"
-          }`}
-      >
-        {isProcessing ? (
-          <>
-            <Loader2 className="animate-spin" size={18} /> Đang chạy...
-          </>
-        ) : (
-          <>
-            <Download size={18} /> Đóng gói XNB
-          </>
-        )}
-      </button>
 
       {files.length > 0 && (
-        <button
-          onClick={onClear}
-          className="w-full py-3 rounded-2xl border border-white/5 text-slate-500 hover:text-red-400 hover:bg-red-400/5 text-xs font-bold transition-all flex items-center justify-center gap-2"
-        >
-          <Trash2 size={14} /> Xóa danh sách
-        </button>
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          {files.map((file, index) => (
+            <div
+              key={`${file.name}-${index}`}
+              className="relative group bg-[var(--sdv-menu-bg)] p-2 rounded border-2 border-[var(--sdv-border)] shadow-sm"
+            >
+              <div className="aspect-square mb-2 overflow-hidden rounded bg-[var(--sdv-cream)] flex items-center justify-center border border-[var(--sdv-border)]">
+                {file.preview ? (
+                  <img
+                    src={file.preview}
+                    alt={file.name}
+                    className="object-contain w-full h-full"
+                  />
+                ) : (
+                  <span className="text-2xl">📄</span>
+                )}
+              </div>
+              <p
+                className="text-xs truncate font-bold text-[var(--sdv-border)]"
+                title={file.name}
+              >
+                {file.name}
+              </p>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

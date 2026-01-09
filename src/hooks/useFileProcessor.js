@@ -60,80 +60,111 @@ export const useFileProcessor = ({ JSZip, libStatus }) => {
     setProgress(0);
   }, []);
 
-  const processFiles = useCallback(async () => {
-    if (libStatus !== "ready" || !JSZip) {
-      addLog("Lỗi: Thư viện JSZip chưa tải xong.", "error");
-      return;
-    }
-    if (files.length === 0) return;
+  const processFiles = useCallback(
+    async (filesList = files, structure = null) => {
+      if (libStatus !== "ready" || !JSZip) {
+        addLog("Lỗi: Thư viện JSZip chưa tải xong.", "error");
+        return;
+      }
+      if (!filesList || filesList.length === 0) return;
 
-    setIsProcessing(true);
-    setLogs([]);
-    setProgress(0);
+      setIsProcessing(true);
+      setLogs([]);
+      setProgress(0);
 
-    const zip = new JSZip();
-    let successCount = 0;
+      const zip = new JSZip();
+      let successCount = 0;
 
-    // Log resize mode
-    if (assetType === "auto") {
-      addLog("Chế độ: Auto-detect theo tên file", "info");
-    } else {
-      const sizeInfo = ASSET_SIZES[assetType];
-      addLog(`Chế độ: ${sizeInfo.label}`, "info");
-    }
+      // Log resize mode
+      if (assetType === "auto") {
+        addLog("Chế độ: Auto-detect theo tên file", "info");
+      } else {
+        const sizeInfo = ASSET_SIZES[assetType];
+        addLog(`Chế độ: ${sizeInfo.label}`, "info");
+      }
 
-    // Build target folder path
-    const targetFolder = buildFolderPath(parentFolder, childFolder);
-    if (targetFolder) {
-      addLog(`📁 Folder đích: Content/${targetFolder}/`, "info");
-    }
+      // Build target folder path from argument OR internal state
+      let pFolder = parentFolder;
+      let cFolder = childFolder;
 
-    // Normalize files (handle duplicates)
-    const { normalizedFiles, logs: normLogs } = normalizeFiles(
-      files,
-      targetFolder
-    );
+      if (structure) {
+        pFolder = structure.parent || "";
+        cFolder = structure.child || "";
+      }
 
-    // Log normalization info
-    normLogs.forEach((log) => addLog(log, "info"));
+      const targetFolder = buildFolderPath(pFolder, cFolder);
+      if (targetFolder) {
+        addLog(`📁 Folder đích: Content/${targetFolder}/`, "info");
+      }
 
-    try {
-      for (let i = 0; i < normalizedFiles.length; i++) {
-        const { file, outputPath } = normalizedFiles[i];
+      // Normalize files (handle duplicates)
+      const { normalizedFiles, logs: normLogs } = normalizeFiles(
+        filesList,
+        targetFolder
+      );
 
-        if (!file.name.toLowerCase().endsWith(".png")) continue;
+      // Log normalization info
+      normLogs.forEach((log) => addLog(log, "info"));
 
-        try {
-          const { buffer, resizeInfo } = await processImageToXNB(file, {
-            assetType,
-          });
-          zip.file(outputPath, buffer);
-          addLog(`✔ ${outputPath} (${resizeInfo})`, "success");
-          successCount++;
-        } catch (err) {
-          addLog(`Lỗi xử lý ${file.name}: ${err.message}`, "error");
+      try {
+        const processedFilesList = [];
+        for (let i = 0; i < normalizedFiles.length; i++) {
+          const { file, outputPath } = normalizedFiles[i];
+
+          if (!file.name.toLowerCase().endsWith(".png")) continue;
+
+          try {
+            const { buffer, resizeInfo } = await processImageToXNB(file, {
+              assetType,
+            });
+            zip.file(outputPath, buffer);
+            addLog(`✔ ${outputPath} (${resizeInfo})`, "success");
+            successCount++;
+
+            processedFilesList.push({ path: outputPath, buffer });
+          } catch (err) {
+            addLog(`Lỗi xử lý ${file.name}: ${err.message}`, "error");
+          }
+
+          setProgress(Math.round(((i + 1) / normalizedFiles.length) * 100));
         }
 
-        setProgress(Math.round(((i + 1) / normalizedFiles.length) * 100));
-      }
+        if (successCount > 0) {
+          // Return valid return for the caller to handle zip generation if needed
+          // But the previous implementation did zip generation here.
+          // The new App.jsx calls `generateZip` from useJSZip separately?
+          // Wait, App.jsx has: `await generateZip(processedFiles);`
+          // So this function should return the processed files (buffers/blobs)
+          // OR the zip object itself.
 
-      if (successCount > 0) {
-        addLog("Đang nén kết quả...", "info");
-        const content = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(content);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Stardew_Mod_Assets_${Date.now()}.zip`;
-        link.click();
-        URL.revokeObjectURL(url);
-        addLog(`Hoàn tất! Đã tạo ${successCount} tệp XNB.`, "success");
+          // Let's modify this to return the processed data so App.jsx can handle zipping
+          // OR keep zipping here.
+          // App.jsx calls `await generateZip(processedFiles)`.
+          // Let's look at `useJSZip.js` to see what `generateZip` does.
+          // Ideally we shouldn't mix responsibilities.
+          // For now, I will KEEP the zipping logic HERE to avoid breaking too much,
+          // but I will also return the list just in case.
+
+          addLog("Đang nén kết quả...", "info");
+          const content = await zip.generateAsync({ type: "blob" });
+          const url = URL.createObjectURL(content);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `Stardew_Mod_Assets_${Date.now()}.zip`;
+          link.click();
+          URL.revokeObjectURL(url);
+          addLog(`Hoàn tất! Đã tạo ${successCount} tệp XNB.`, "success");
+          return processedFilesList;
+        }
+      } catch (err) {
+        addLog(`Lỗi hệ thống: ${err.message}`, "error");
+        throw err;
+      } finally {
+        setIsProcessing(false);
       }
-    } catch (err) {
-      addLog(`Lỗi hệ thống: ${err.message}`, "error");
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [files, JSZip, libStatus, assetType, parentFolder, childFolder, addLog]);
+    },
+    [files, JSZip, libStatus, assetType, parentFolder, childFolder, addLog]
+  );
 
   return {
     files,

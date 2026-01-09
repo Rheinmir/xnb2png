@@ -1,83 +1,82 @@
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import "./index.css";
-import { useJSZip } from "./hooks/useJSZip.js";
-import { useFileProcessor, ASSET_SIZES } from "./hooks/useFileProcessor.js";
-import Header from "./components/Header.jsx";
-import DropZone from "./components/DropZone.jsx";
-import LogPanel from "./components/LogPanel.jsx";
-import Footer from "./components/Footer.jsx";
+import DropZone from "./components/DropZone";
+import FolderStructureSelector from "./components/FolderStructureSelector";
+import useFileProcessor from "./hooks/useFileProcessor";
+import useJSZip from "./hooks/useJSZip";
 
-/**
- * Main Application Component
- * Stardew XNB Packer Pro - PNG to XNB converter
- */
-const App = () => {
+function App() {
+  const [targetStructure, setTargetStructure] = useState(null);
   const { status: libStatus, JSZip } = useJSZip();
+  const { files, processFiles, clearFiles } = useFileProcessor({
+    JSZip,
+    libStatus,
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const {
-    files,
-    isProcessing,
-    logs,
-    progress,
-    fileInputRef,
-    assetType,
-    setAssetType,
-    parentFolder,
-    setParentFolder,
-    childFolder,
-    setChildFolder,
-    addLog,
-    handleFileChange,
-    clearFiles,
-    processFiles,
-  } = useFileProcessor({ JSZip, libStatus });
-
-  // Log when JSZip is ready
-  useEffect(() => {
-    if (libStatus === "ready") {
-      addLog("Hệ thống nén (JSZip) đã sẵn sàng.", "success");
-    } else if (libStatus === "error") {
-      addLog(
-        "Không thể tải thư viện JSZip. Vui lòng kiểm tra kết nối mạng.",
-        "error"
-      );
+  const handleConvert = async () => {
+    if (files.length === 0) return;
+    setIsProcessing(true);
+    try {
+      // processFiles handles the actual conversion and download internally
+      await processFiles(files, targetStructure);
+    } catch (error) {
+      console.error("Conversion failed:", error);
+      alert("Conversion failed!");
+    } finally {
+      setIsProcessing(false);
     }
-  }, [libStatus, addLog]);
+  };
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-200 p-4 md:p-8 font-sans">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <Header libStatus={libStatus} />
+    <div className="min-h-screen p-8 flex items-center justify-center">
+      <div
+        className="max-w-4xl w-full mx-auto p-8 rounded-xl shadow-2xl relative"
+        style={{
+          backgroundColor: "var(--sdv-menu-bg)",
+          border: "8px solid var(--sdv-border)",
+          boxShadow: "8px 8px 0 rgba(0,0,0,0.4)",
+        }}
+      >
+        {/* Decorative corner screws */}
+        <div className="absolute top-2 left-2 w-4 h-4 bg-[var(--sdv-brown)] rounded-full border-2 border-[var(--sdv-cream)]"></div>
+        <div className="absolute top-2 right-2 w-4 h-4 bg-[var(--sdv-brown)] rounded-full border-2 border-[var(--sdv-cream)]"></div>
+        <div className="absolute bottom-2 left-2 w-4 h-4 bg-[var(--sdv-brown)] rounded-full border-2 border-[var(--sdv-cream)]"></div>
+        <div className="absolute bottom-2 right-2 w-4 h-4 bg-[var(--sdv-brown)] rounded-full border-2 border-[var(--sdv-cream)]"></div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <DropZone
-            files={files}
-            fileInputRef={fileInputRef}
-            isProcessing={isProcessing}
-            libStatus={libStatus}
-            assetType={assetType}
-            assetSizes={ASSET_SIZES}
-            parentFolder={parentFolder}
-            childFolder={childFolder}
-            onAssetTypeChange={setAssetType}
-            onParentFolderChange={setParentFolder}
-            onChildFolderChange={setChildFolder}
-            onFileChange={handleFileChange}
-            onProcess={processFiles}
-            onClear={clearFiles}
-          />
+        <h1 className="text-5xl font-bold mb-8 text-[var(--sdv-brown)] drop-shadow-md text-center">
+          Stardew XNB Converter
+        </h1>
 
-          <LogPanel
-            logs={logs}
-            isProcessing={isProcessing}
-            progress={progress}
-          />
+        <div className="space-y-8 bg-[var(--sdv-cream)] p-6 rounded-lg border-4 border-[var(--sdv-border)]">
+          <FolderStructureSelector onSelect={setTargetStructure} />
+
+          <DropZone onFilesAdded={processFiles} files={files} />
+
+          <div className="flex justify-center gap-4 mt-6">
+            <button
+              onClick={clearFiles}
+              className="px-8 py-3 text-xl hover:bg-red-400 hover:text-white transition-colors"
+              style={{ backgroundColor: "#ff6b6b" }}
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleConvert}
+              disabled={files.length === 0 || isProcessing}
+              className="px-8 py-3 text-xl font-bold"
+            >
+              {isProcessing ? "Processing..." : "CONVERT!"}
+            </button>
+          </div>
         </div>
 
-        <Footer />
+        <div className="mt-4 text-center text-[var(--sdv-brown)] text-sm opacity-80">
+          <p>Drag & drop PNG files to convert to XNB</p>
+        </div>
       </div>
     </div>
   );
-};
+}
 
 export default App;
